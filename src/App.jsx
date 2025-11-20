@@ -1,73 +1,134 @@
-function App() {
+import React, { useEffect, useMemo, useState } from 'react'
+import Header from './components/Header'
+import SubjectCard from './components/SubjectCard'
+import SearchBar from './components/SearchBar'
+import ChapterList from './components/ChapterList'
+
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+function SubjectsScreen({ onOpenSubject }) {
+  const [subjects, setSubjects] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/subjects`)
+        const data = await res.json()
+        setSubjects(data)
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Subtle pattern overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05),transparent_50%)]"></div>
-
-      <div className="relative min-h-screen flex items-center justify-center p-8">
-        <div className="max-w-2xl w-full">
-          {/* Header with Flames icon */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center mb-6">
-              <img
-                src="/flame-icon.svg"
-                alt="Flames"
-                className="w-24 h-24 drop-shadow-[0_0_25px_rgba(59,130,246,0.5)]"
-              />
-            </div>
-
-            <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-              Flames Blue
-            </h1>
-
-            <p className="text-xl text-blue-200 mb-6">
-              Build applications through conversation
-            </p>
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-8 shadow-xl mb-6">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center font-bold">
-                1
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Describe your idea</h3>
-                <p className="text-blue-200/80 text-sm">Use the chat panel on the left to tell the AI what you want to build</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4 mb-6">
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center font-bold">
-                2
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Watch it build</h3>
-                <p className="text-blue-200/80 text-sm">Your app will appear in this preview as the AI generates the code</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center font-bold">
-                3
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-1">Refine and iterate</h3>
-                <p className="text-blue-200/80 text-sm">Continue the conversation to add features and make changes</p>
-              </div>
+    <div className="min-h-screen bg-slate-900">
+      <Header title="HSC Study" subtitle="Maharashtra Board • Std 12" />
+      <div className="max-w-md mx-auto px-4 py-4 space-y-3">
+        {loading ? (
+          <div className="text-center text-blue-300/70 py-20">Loading subjects…</div>
+        ) : (
+          subjects.map((s) => (
+            <SubjectCard
+              key={s.id}
+              title={s.title}
+              chaptersCount={undefined}
+              onClick={() => onOpenSubject(s)}
+            />
+          ))
+        )}
+        {(!loading && subjects.length === 0) && (
+          <div className="text-center text-blue-300/70 py-20">
+            No subjects found. Tap to seed data first.
+            <div className="mt-4">
+              <SeedButton onSeeded={() => window.location.reload()} />
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="text-center">
-            <p className="text-sm text-blue-300/60">
-              No coding required • Just describe what you want
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )
+}
+
+function SeedButton({ onSeeded }) {
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(null)
+  const seed = async () => {
+    setBusy(true)
+    try {
+      const res = await fetch(`${API_BASE}/seed`, { method: 'POST' })
+      const data = await res.json()
+      setDone(data)
+      onSeeded?.()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      onClick={seed}
+      disabled={busy}
+      className="px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-60"
+    >
+      {busy ? 'Seeding…' : done ? 'Seeded' : 'Seed sample chapters'}
+    </button>
+  )
+}
+
+function ChaptersScreen({ subject, onBack }) {
+  const [query, setQuery] = useState('')
+  const [chapters, setChapters] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchChapters = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/subjects/${subject.id}/chapters`)
+        const data = await res.json()
+        setChapters(data)
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchChapters()
+  }, [subject.id])
+
+  const filtered = useMemo(() => {
+    if (!query) return chapters
+    return chapters.filter((c) => c.title.toLowerCase().includes(query.toLowerCase()))
+  }, [query, chapters])
+
+  return (
+    <div className="min-h-screen bg-slate-900">
+      <Header title={subject.title} subtitle="Chapters" onBack={onBack} />
+      <div className="max-w-md mx-auto px-4 py-4 space-y-4">
+        <SearchBar value={query} onChange={setQuery} placeholder="Search chapters" />
+        {loading ? (
+          <div className="text-center text-blue-300/70 py-20">Loading chapters…</div>
+        ) : (
+          <ChapterList chapters={filtered} onOpen={(c) => alert(`${c.title}`)} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function App() {
+  const [activeSubject, setActiveSubject] = useState(null)
+
+  if (activeSubject) {
+    return <ChaptersScreen subject={activeSubject} onBack={() => setActiveSubject(null)} />
+  }
+
+  return <SubjectsScreen onOpenSubject={setActiveSubject} />
 }
 
 export default App
